@@ -9,7 +9,7 @@ def run_command(command):
     print(f"Running: {command}")
     start_time = time.time()
     process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True)
-    
+
     # Print output in real-time
     for line in process.stdout:
         line = line.rstrip()
@@ -37,7 +37,7 @@ def main():
     parser.add_argument('--modulation', type=str, choices=['BPSK', 'QPSK', 'both'], default='both',
                         help='Modulation scheme to use')
     parser.add_argument('--models', type=str, default='all',
-                        help='Models to train (comma separated): mobilenetv2,densenet,resnet50 or all')
+                        help='Models to train (comma separated): mobilenetv2,densenet,resnet50,vgg,squeezenet or all')
     parser.add_argument('--configs', type=str, default='all',
                         help='Antenna configurations (comma separated): 2x1,2x2,3x1,4x1,4x2,4x4 or all')
     parser.add_argument('--batch_size', type=int, default=256, help='Batch size for training')
@@ -52,8 +52,9 @@ def main():
     os.makedirs(args.result_dir, exist_ok=True)
     
     # Parse models
+    # Parse models
     if args.models.lower() == 'all':
-        models = ['mobilenetv2', 'densenet', 'resnet50', 'vgg']
+        models = ['mobilenetv2', 'densenet', 'resnet50', 'vgg', 'squeezenet']  
     else:
         models = [model.strip().lower() for model in args.models.split(',')]
     
@@ -137,3 +138,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+    # python batch_train.py --mode compare --models mobilenetv2 --configs 2x4 --modulation both --channel both --result_dir ./results
+    # python batch_train.py --mode compare --models mobilenetv2 --configs 2x4 --modulation both --channel both --result_dir ./comprehensive_results

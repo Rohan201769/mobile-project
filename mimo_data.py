@@ -176,6 +176,64 @@ class MIMODataset(Dataset):
                     stbc_matrix[3, 2] = s2
                     stbc_matrix[3, 3] = s1
             return stbc_matrix
+        
+        elif self.tx_antennas == 8:
+            # Implement 8 antenna STBC using block-diagonal combination of two 4x4 STBCs
+            # This gives a code rate of 1 symbol per channel use
+            stbc_matrix = np.zeros((8, 8), dtype=complex)
+            
+            for i in range(0, len(symbols), 8):
+                if i+7 < len(symbols):
+                    # First 4 symbols for first 4x4 block
+                    s1, s2, s3, s4 = symbols[i:i+4]
+                    # Next 4 symbols for second 4x4 block
+                    s5, s6, s7, s8 = symbols[i+4:i+8]
+                    
+                    # First 4x4 block - Upper-left quadrant
+                    # First row
+                    stbc_matrix[0, 0] = s1
+                    stbc_matrix[0, 1] = s2
+                    stbc_matrix[0, 2] = s3
+                    stbc_matrix[0, 3] = np.conj(s4)
+                    # Second row
+                    stbc_matrix[1, 0] = -np.conj(s2)
+                    stbc_matrix[1, 1] = np.conj(s1)
+                    stbc_matrix[1, 2] = -np.conj(s4)
+                    stbc_matrix[1, 3] = np.conj(s3)
+                    # Third row
+                    stbc_matrix[2, 0] = -np.conj(s3)
+                    stbc_matrix[2, 1] = s4
+                    stbc_matrix[2, 2] = np.conj(s1)
+                    stbc_matrix[2, 3] = -np.conj(s2)
+                    # Fourth row
+                    stbc_matrix[3, 0] = np.conj(s4)
+                    stbc_matrix[3, 1] = -s3
+                    stbc_matrix[3, 2] = s2
+                    stbc_matrix[3, 3] = s1
+                    
+                    # Second 4x4 block - Lower-right quadrant
+                    # Fifth row
+                    stbc_matrix[4, 4] = s5
+                    stbc_matrix[4, 5] = s6
+                    stbc_matrix[4, 6] = s7
+                    stbc_matrix[4, 7] = np.conj(s8)
+                    # Sixth row
+                    stbc_matrix[5, 4] = -np.conj(s6)
+                    stbc_matrix[5, 5] = np.conj(s5)
+                    stbc_matrix[5, 6] = -np.conj(s8)
+                    stbc_matrix[5, 7] = np.conj(s7)
+                    # Seventh row
+                    stbc_matrix[6, 4] = -np.conj(s7)
+                    stbc_matrix[6, 5] = s8
+                    stbc_matrix[6, 6] = np.conj(s5)
+                    stbc_matrix[6, 7] = -np.conj(s6)
+                    # Eighth row
+                    stbc_matrix[7, 4] = np.conj(s8)
+                    stbc_matrix[7, 5] = -s7
+                    stbc_matrix[7, 6] = s6
+                    stbc_matrix[7, 7] = s5
+                    
+            return stbc_matrix
     
     def _apply_channel(self, stbc_symbols):
         """Apply channel effects to the signal"""

@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import numpy as np
 
 
 # ------------- Basic Blocks for DenseNet -------------
@@ -65,6 +66,8 @@ class DenseNetForMIMO(nn.Module):
             self.actual_in_channels = 8 * rx_antennas  # 8 per rx antenna
         elif tx_antennas == 4:
             self.actual_in_channels = 4 * rx_antennas  # 4 per rx antenna
+        elif tx_antennas == 8:
+            self.actual_in_channels = 8 * rx_antennas  # 8 per rx antenna for 8x8 STBC
         else:
             raise ValueError(f"Unsupported number of transmit antennas: {tx_antennas}")
         
@@ -198,6 +201,8 @@ class ResNetForMIMO(nn.Module):
             self.actual_in_channels = 8 * rx_antennas  # 8 per rx antenna
         elif tx_antennas == 4:
             self.actual_in_channels = 4 * rx_antennas  # 4 per rx antenna
+        elif tx_antennas == 8:
+            self.actual_in_channels = 8 * rx_antennas  # 8 per rx antenna for 8x8 STBC
         else:
             raise ValueError(f"Unsupported number of transmit antennas: {tx_antennas}")
         
@@ -295,6 +300,8 @@ class MobileNetV2ForMIMO(nn.Module):
             self.actual_in_channels = 8 * rx_antennas  # 8 per rx antenna
         elif tx_antennas == 4:
             self.actual_in_channels = 4 * rx_antennas  # 4 per rx antenna
+        elif tx_antennas == 8:
+            self.actual_in_channels = 8 * rx_antennas  # 8 per rx antenna for 8x8 STBC
         else:
             raise ValueError(f"Unsupported number of transmit antennas: {tx_antennas}")
         
@@ -392,8 +399,7 @@ class MobileNetV2ForMIMO(nn.Module):
         return x
     
 
-# Add this to your mimo_models.py file
-
+# ------------- VGG Model -------------
 class VGGForMIMO(nn.Module):
     def __init__(self, in_channels=2, rx_antennas=1, tx_antennas=2, num_classes=8):
         super(VGGForMIMO, self).__init__()
@@ -405,6 +411,8 @@ class VGGForMIMO(nn.Module):
             self.actual_in_channels = 8 * rx_antennas  # 8 per rx antenna
         elif tx_antennas == 4:
             self.actual_in_channels = 4 * rx_antennas  # 4 per rx antenna
+        elif tx_antennas == 8:
+            self.actual_in_channels = 8 * rx_antennas  # 8 per rx antenna for 8x8 STBC
         else:
             raise ValueError(f"Unsupported number of transmit antennas: {tx_antennas}")
         
@@ -471,5 +479,90 @@ class VGGForMIMO(nn.Module):
     
     def forward(self, x):
         x = self.features(x)
+        x = self.classifier(x)
+        return x
+    
+
+
+# ------------- SqueezeNet Components -------------
+class FireModule(nn.Module):
+    def __init__(self, in_channels, squeeze_channels, expand1x1_channels, expand3x3_channels):
+        super(FireModule, self).__init__()
+        self.squeeze = nn.Conv1d(in_channels, squeeze_channels, kernel_size=1)
+        self.squeeze_activation = nn.ReLU(inplace=True)
+        self.expand1x1 = nn.Conv1d(squeeze_channels, expand1x1_channels, kernel_size=1)
+        self.expand1x1_activation = nn.ReLU(inplace=True)
+        self.expand3x3 = nn.Conv1d(squeeze_channels, expand3x3_channels, kernel_size=3, padding=1)
+        self.expand3x3_activation = nn.ReLU(inplace=True)
+    
+    def forward(self, x):
+        x = self.squeeze_activation(self.squeeze(x))
+        return torch.cat([
+            self.expand1x1_activation(self.expand1x1(x)),
+            self.expand3x3_activation(self.expand3x3(x))
+        ], 1)
+
+
+# ------------- SqueezeNet Model -------------
+class SqueezeNetForMIMO(nn.Module):
+    def __init__(self, in_channels=2, rx_antennas=1, tx_antennas=2, num_classes=8, version='1_0'):
+        super(SqueezeNetForMIMO, self).__init__()
+        
+        # Calculate actual input channels based on tx and rx antennas
+        if tx_antennas == 2:
+            self.actual_in_channels = in_channels * rx_antennas  # 2 per rx antenna
+        elif tx_antennas == 3:
+            self.actual_in_channels = 8 * rx_antennas  # 8 per rx antenna
+        elif tx_antennas == 4:
+            self.actual_in_channels = 4 * rx_antennas  # 4 per rx antenna
+        elif tx_antennas == 8:
+            self.actual_in_channels = 8 * rx_antennas  # 8 per rx antenna for 8x8 STBC
+        else:
+            raise ValueError(f"Unsupported number of transmit antennas: {tx_antennas}")
+        
+        print(f"Creating SqueezeNet with rx={rx_antennas}, tx={tx_antennas}, in_channels={in_channels}")
+        print(f"Setting actual_in_channels to {self.actual_in_channels}")
+        
+        # Simplified architecture for small sequence lengths
+        self.features = nn.Sequential(
+            nn.Conv1d(self.actual_in_channels, 64, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(inplace=True),
+            FireModule(64, 16, 64, 64),
+            FireModule(128, 16, 64, 64),
+            FireModule(128, 32, 128, 128),
+            FireModule(256, 32, 128, 128),
+            FireModule(256, 48, 192, 192),
+            FireModule(384, 48, 192, 192),
+        )
+        
+        # Final convolution
+        self.final_conv = nn.Conv1d(384, 512, kernel_size=1)
+        self.dropout = nn.Dropout(p=0.5)
+        self.relu = nn.ReLU(inplace=True)
+        
+        # Adaptive pooling to handle variable size inputs
+        self.global_pool = nn.AdaptiveAvgPool1d(1)
+        
+        # Classifier
+        self.classifier = nn.Sequential(
+            nn.Linear(512, 256),
+            nn.ReLU(inplace=True),
+            nn.Dropout(p=0.5),
+            nn.Linear(256, num_classes),
+            nn.Sigmoid()  # Binary classification for each bit
+        )
+        
+        # Initialize weights
+        for m in self.modules():
+            if isinstance(m, nn.Conv1d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+    
+    def forward(self, x):
+        x = self.features(x)
+        x = self.relu(self.final_conv(x))
+        x = self.global_pool(x)
+        x = x.view(x.size(0), -1)
         x = self.classifier(x)
         return x

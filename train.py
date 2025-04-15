@@ -9,7 +9,7 @@ import time
 import argparse
 
 # Import our model modules
-from mimo_models import DenseNetForMIMO, ResNet50ForMIMO, MobileNetV2ForMIMO, VGGForMIMO
+from mimo_models import DenseNetForMIMO, ResNet50ForMIMO, MobileNetV2ForMIMO, VGGForMIMO, SqueezeNetForMIMO
 from mimo_data import create_mimo_dataloaders
 
 def train_model(model, train_loader, val_loader, criterion, optimizer, scheduler, num_epochs=8, device='cuda'):
@@ -341,11 +341,11 @@ def main():
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Train MIMO receiver models')
     parser.add_argument('--model', type=str, default='mobilenetv2', 
-                   choices=['densenet', 'resnet50', 'mobilenetv2', 'vgg'],
+                   choices=['densenet', 'resnet50', 'mobilenetv2', 'vgg', 'squeezenet'],  
                    help='Model architecture to use')
-    parser.add_argument('--tx', type=int, default=2, choices=[2, 3, 4],
+    parser.add_argument('--tx', type=int, default=2, choices=[2, 3, 4, 8],
                         help='Number of transmit antennas')
-    parser.add_argument('--rx', type=int, default=1, choices=[1, 2, 3, 4],
+    parser.add_argument('--rx', type=int, default=1, choices=[1, 2, 3, 4, 8],
                         help='Number of receive antennas')
     parser.add_argument('--modulation', type=str, default='BPSK', choices=['BPSK', 'QPSK'],
                         help='Modulation scheme')
@@ -392,12 +392,15 @@ def main():
     ber_save_path = os.path.join(args.save_dir, f"{config_str}_ber.png")
     
     # Create model
+    # Create model
     if args.model == 'densenet':
         model = DenseNetForMIMO(in_channels=2, rx_antennas=args.rx, tx_antennas=args.tx, num_classes=8)
     elif args.model == 'resnet50':
         model = ResNet50ForMIMO(in_channels=2, rx_antennas=args.rx, tx_antennas=args.tx, num_classes=8)
     elif args.model == 'vgg':
         model = VGGForMIMO(in_channels=2, rx_antennas=args.rx, tx_antennas=args.tx, num_classes=8)
+    elif args.model == 'squeezenet':  # Add this condition
+        model = SqueezeNetForMIMO(in_channels=2, rx_antennas=args.rx, tx_antennas=args.tx, num_classes=8)
     else:  # mobilenetv2
         model = MobileNetV2ForMIMO(in_channels=2, rx_antennas=args.rx, tx_antennas=args.tx, num_classes=8)
     
@@ -464,6 +467,7 @@ def main():
     # Test mode
     elif args.run_mode == 'test':
         # Load model if specified
+        # Load model if specified
         if args.load_model:
             if args.model == 'densenet':
                 model = load_model(DenseNetForMIMO, args.load_model, in_channels=2, rx_antennas=args.rx, tx_antennas=args.tx, num_classes=8)
@@ -471,6 +475,8 @@ def main():
                 model = load_model(ResNet50ForMIMO, args.load_model, in_channels=2, rx_antennas=args.rx, tx_antennas=args.tx, num_classes=8)
             elif args.model == 'vgg':
                 model = load_model(VGGForMIMO, args.load_model, in_channels=2, rx_antennas=args.rx, tx_antennas=args.tx, num_classes=8)
+            elif args.model == 'squeezenet':  # Add this condition
+                model = load_model(SqueezeNetForMIMO, args.load_model, in_channels=2, rx_antennas=args.rx, tx_antennas=args.tx, num_classes=8)
             else:  # mobilenetv2
                 model = load_model(MobileNetV2ForMIMO, args.load_model, in_channels=2, rx_antennas=args.rx, tx_antennas=args.tx, num_classes=8)
             model = model.to(device)
@@ -505,6 +511,7 @@ def main():
     # BER vs SNR mode
     elif args.run_mode == 'ber':
         # Load model if specified
+        # Load model if specified
         if args.load_model:
             if args.model == 'densenet':
                 model = load_model(DenseNetForMIMO, args.load_model, in_channels=2, rx_antennas=args.rx, tx_antennas=args.tx, num_classes=8)
@@ -512,6 +519,8 @@ def main():
                 model = load_model(ResNet50ForMIMO, args.load_model, in_channels=2, rx_antennas=args.rx, tx_antennas=args.tx, num_classes=8)
             elif args.model == 'vgg':
                 model = load_model(VGGForMIMO, args.load_model, in_channels=2, rx_antennas=args.rx, tx_antennas=args.tx, num_classes=8)
+            elif args.model == 'squeezenet':  # Add this condition
+                model = load_model(SqueezeNetForMIMO, args.load_model, in_channels=2, rx_antennas=args.rx, tx_antennas=args.tx, num_classes=8)
             else:  # mobilenetv2
                 model = load_model(MobileNetV2ForMIMO, args.load_model, in_channels=2, rx_antennas=args.rx, tx_antennas=args.tx, num_classes=8)
             model = model.to(device)

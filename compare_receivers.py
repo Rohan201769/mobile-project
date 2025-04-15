@@ -6,7 +6,7 @@ import argparse
 import os
 
 # Import our modules
-from mimo_models import DenseNetForMIMO, ResNet50ForMIMO, MobileNetV2ForMIMO, VGGForMIMO
+from mimo_models import DenseNetForMIMO, ResNet50ForMIMO, MobileNetV2ForMIMO, VGGForMIMO, SqueezeNetForMIMO
 from mimo_data import MIMODataset, create_mimo_dataloaders
 
 class TraditionalReceiver:
@@ -166,12 +166,15 @@ def compare_receivers(snr_range, tx_antennas, rx_antennas, modulation, channel_t
     intelligent_ber = []
     
     # Load intelligent receiver model
+    # Load intelligent receiver model
     if model_type == 'densenet':
         model = DenseNetForMIMO(in_channels=2, rx_antennas=rx_antennas, tx_antennas=tx_antennas, num_classes=8)
     elif model_type == 'resnet50':
         model = ResNet50ForMIMO(in_channels=2, rx_antennas=rx_antennas, tx_antennas=tx_antennas, num_classes=8)
     elif model_type == 'vgg':
         model = VGGForMIMO(in_channels=2, rx_antennas=rx_antennas, tx_antennas=tx_antennas, num_classes=8)
+    elif model_type == 'squeezenet':  # Add this condition
+        model = SqueezeNetForMIMO(in_channels=2, rx_antennas=rx_antennas, tx_antennas=tx_antennas, num_classes=8)
     else:  # mobilenetv2
         model = MobileNetV2ForMIMO(in_channels=2, rx_antennas=rx_antennas, tx_antennas=tx_antennas, num_classes=8)
     
@@ -208,7 +211,17 @@ def compare_receivers(snr_range, tx_antennas, rx_antennas, modulation, channel_t
                 print(f"Recreating model with {detected_rx_antennas} rx antennas")
                 rx_antennas = detected_rx_antennas
                 model = DenseNetForMIMO(in_channels=2, rx_antennas=rx_antennas, tx_antennas=tx_antennas, num_classes=8)
-                
+
+        # For SqueezeNet, check the first convolutional layer's weight shape
+        elif model_type == 'squeezenet' and 'features.0.weight' in checkpoint:
+            saved_in_channels = checkpoint['features.0.weight'].shape[1]
+            detected_rx_antennas = saved_in_channels // 2
+            if detected_rx_antennas != rx_antennas:
+                print(f"Mismatch detected: Model was trained with {detected_rx_antennas} rx antennas but parameter is {rx_antennas}")
+                print(f"Recreating model with {detected_rx_antennas} rx antennas")
+                rx_antennas = detected_rx_antennas
+                model = SqueezeNetForMIMO(in_channels=2, rx_antennas=rx_antennas, tx_antennas=tx_antennas, num_classes=8)
+
         elif model_type == 'vgg' and 'features.0.weight' in checkpoint:
             saved_in_channels = checkpoint['features.0.weight'].shape[1]
             detected_rx_antennas = saved_in_channels // 2
@@ -219,8 +232,9 @@ def compare_receivers(snr_range, tx_antennas, rx_antennas, modulation, channel_t
                 model = VGGForMIMO(in_channels=2, rx_antennas=rx_antennas, tx_antennas=tx_antennas, num_classes=8)
     except Exception as e:
         print(f"Warning: Could not automatically detect receiving antennas: {e}")
-    
-    model.load_state_dict(torch.load(intelligent_model_path, weights_only=True))
+    model.load_state_dict(torch.load(intelligent_model_path, map_location=torch.device('cpu')))
+
+    # model.load_state_dict(torch.load(intelligent_model_path, weights_only=True))
     model = model.to(device)
     model.eval()
     
@@ -297,11 +311,11 @@ def main():
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Compare traditional and intelligent MIMO receivers')
     parser.add_argument('--model', type=str, default='mobilenetv2', 
-                       choices=['densenet', 'resnet50', 'mobilenetv2', 'vgg'],
-                       help='Intelligent receiver model architecture')
-    parser.add_argument('--tx', type=int, default=2, choices=[2, 3, 4],
+                   choices=['densenet', 'resnet50', 'mobilenetv2', 'vgg', 'squeezenet'],  
+                   help='Intelligent receiver model architecture')
+    parser.add_argument('--tx', type=int, default=2, choices=[2, 3, 4,8],
                       help='Number of transmit antennas')
-    parser.add_argument('--rx', type=int, default=1, choices=[1, 2, 3, 4],
+    parser.add_argument('--rx', type=int, default=1, choices=[1, 2, 3, 4,8],
                       help='Number of receive antennas')
     parser.add_argument('--modulation', type=str, default='BPSK', choices=['BPSK', 'QPSK'],
                       help='Modulation scheme')
