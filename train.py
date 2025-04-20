@@ -8,7 +8,7 @@ import os
 import time
 import argparse
 
-# Import our model modules
+
 from mimo_models import DenseNetForMIMO, ResNet50ForMIMO, MobileNetV2ForMIMO, VGGForMIMO, SqueezeNetForMIMO
 from mimo_data import create_mimo_dataloaders
 
@@ -43,7 +43,7 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, scheduler
         print(f'Epoch {epoch+1}/{num_epochs}')
         print('-' * 10)
         
-        # Training phase
+        
         model.train()
         running_loss = 0.0
         running_corrects = 0
@@ -53,21 +53,21 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, scheduler
             inputs = inputs.to(device)
             targets = targets.to(device)
             
-            # Zero the parameter gradients
+            
             optimizer.zero_grad()
             
-            # Forward
+            
             outputs = model(inputs)
             loss = criterion(outputs, targets)
             
-            # Backward + optimize
+            
             loss.backward()
             optimizer.step()
             
-            # Statistics
+            
             running_loss += loss.item() * inputs.size(0)
             
-            # For binary accuracy
+            
             predictions = (outputs > 0.5).float()
             correct_predictions = torch.sum(predictions == targets).item()
             running_corrects += correct_predictions
@@ -81,7 +81,7 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, scheduler
         
         print(f'Train Loss: {epoch_loss:.4f} Acc: {epoch_acc:.4f}')
         
-        # Validation phase
+        
         model.eval()
         running_loss = 0.0
         running_corrects = 0
@@ -92,14 +92,14 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, scheduler
                 inputs = inputs.to(device)
                 targets = targets.to(device)
                 
-                # Forward
+                
                 outputs = model(inputs)
                 loss = criterion(outputs, targets)
                 
-                # Statistics
+                
                 running_loss += loss.item() * inputs.size(0)
                 
-                # For binary accuracy
+                
                 predictions = (outputs > 0.5).float()
                 correct_predictions = torch.sum(predictions == targets).item()
                 running_corrects += correct_predictions
@@ -113,7 +113,7 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, scheduler
         
         print(f'Val Loss: {epoch_loss:.4f} Acc: {epoch_acc:.4f}')
         
-        # Update learning rate
+        
         scheduler.step()
     
     time_elapsed = time.time() - start_time
@@ -150,20 +150,20 @@ def evaluate_model(model, test_loader, criterion, device='cuda'):
             inputs = inputs.to(device)
             targets = targets.to(device)
             
-            # Forward
+            
             outputs = model(inputs)
             loss = criterion(outputs, targets)
             
-            # Statistics
+            
             running_loss += loss.item() * inputs.size(0)
             
-            # For binary accuracy
+            
             predictions = (outputs > 0.5).float()
             correct_predictions = torch.sum(predictions == targets).item()
             running_corrects += correct_predictions
             total_samples += (inputs.size(0) * targets.size(1))
             
-            # For BER
+            
             total_bits += targets.numel()
             bit_errors += torch.sum(predictions != targets).item()
     
@@ -195,24 +195,24 @@ def compute_ber_vs_snr(model, tx_antennas, rx_antennas, modulation='BPSK',
         snr_values: SNR values
         ber_values: BER values
     """
-    # SNR values to test (as in the paper)
+    
     snr_values = np.arange(0, 8.5, 0.5)
     ber_values = []
     
     model.eval()
     
     for snr in tqdm(snr_values, desc="Computing BER vs SNR"):
-        # Create test dataset with fixed SNR
+        
         _, _, test_loader = create_mimo_dataloaders(
             tx_antennas=tx_antennas,
             rx_antennas=rx_antennas,
             modulation=modulation,
-            train_samples=1000,  # Not using train and val loaders
+            train_samples=1000,  
             val_samples=1000,
             test_samples=test_samples,
             batch_size=batch_size,
-            Eb_N0_dB_train=[0],  # Not using
-            Eb_N0_dB_test=[snr],  # Single SNR value
+            Eb_N0_dB_train=[0],  
+            Eb_N0_dB_test=[snr],  
             channel_type=channel_type
         )
         
@@ -224,10 +224,10 @@ def compute_ber_vs_snr(model, tx_antennas, rx_antennas, modulation='BPSK',
                 inputs = inputs.to(device)
                 targets = targets.to(device)
                 
-                # Forward
+                
                 outputs = model(inputs)
                 
-                # For BER
+                
                 predictions = (outputs > 0.5).float()
                 total_bits += targets.numel()
                 bit_errors += torch.sum(predictions != targets).item()
@@ -247,20 +247,20 @@ def save_model(model, filepath):
 
 def load_model(model_class, filepath, **kwargs):
     """Load model from file"""
-    # Check if the model was trained with a different number of receiving antennas
+    
     try:
         checkpoint = torch.load(filepath)
         
-        # Instead of automatically changing rx_antennas, just print a warning if there's a mismatch
-        # For MobileNetV2, check the first convolutional layer's weight shape
+        
+        
         if model_class.__name__ == 'MobileNetV2ForMIMO' and 'shallow_features.0.weight' in checkpoint:
-            # Extract the number of input channels from the saved weights
+            
             saved_in_channels = checkpoint['shallow_features.0.weight'].shape[1]
-            # Calculate the actual number of receiving antennas based on 2 channels (I/Q) per antenna
+            
             rx_antennas = kwargs.get('rx_antennas', 1)
             tx_antennas = kwargs.get('tx_antennas', 2)
             
-            # Calculate expected channels based on our logic
+            
             expected_channels = 0
             if tx_antennas == 2:
                 expected_channels = 2 * rx_antennas
@@ -269,7 +269,7 @@ def load_model(model_class, filepath, **kwargs):
             elif tx_antennas == 4:
                 expected_channels = 4 * rx_antennas
             
-            # If mismatch, use the channels from the saved model instead
+            
             if saved_in_channels != expected_channels:
                 print(f"Warning: Model was trained with different channel configuration.")
                 print(f"Using {saved_in_channels} input channels from saved model instead of {expected_channels}.")
@@ -282,11 +282,11 @@ def load_model(model_class, filepath, **kwargs):
                 
                 print(f"Setting rx_antennas to {kwargs['rx_antennas']}")
         
-        # Apply similar logic for other model types
+        
     except Exception as e:
         print(f"Warning: Could not analyze saved model: {e}")
     
-    # Create the model with the potentially updated kwargs
+    
     model = model_class(**kwargs)
     model.load_state_dict(torch.load(filepath))
     print(f"Model loaded from {filepath}")
@@ -338,7 +338,7 @@ def plot_ber_vs_snr(snr_values, ber_values, model_name, save_path=None):
 
 
 def main():
-    # Parse command line arguments
+    
     parser = argparse.ArgumentParser(description='Train MIMO receiver models')
     parser.add_argument('--model', type=str, default='mobilenetv2', 
                    choices=['densenet', 'resnet50', 'mobilenetv2', 'vgg', 'squeezenet'],  
@@ -374,7 +374,7 @@ def main():
     
     args = parser.parse_args()
     
-    # Set device
+    
     if args.device:
         device = args.device
     else:
@@ -382,33 +382,33 @@ def main():
     
     print(f"Using device: {device}")
     
-    # Create save directory
+    
     os.makedirs(args.save_dir, exist_ok=True)
     
-    # Model configuration
+    
     config_str = f"{args.model}_{args.tx}x{args.rx}_{args.modulation}_{args.channel}"
     model_save_path = os.path.join(args.save_dir, f"{config_str}_model.pth")
     history_save_path = os.path.join(args.save_dir, f"{config_str}_history.png")
     ber_save_path = os.path.join(args.save_dir, f"{config_str}_ber.png")
     
-    # Create model
-    # Create model
+    
+    
     if args.model == 'densenet':
         model = DenseNetForMIMO(in_channels=2, rx_antennas=args.rx, tx_antennas=args.tx, num_classes=8)
     elif args.model == 'resnet50':
         model = ResNet50ForMIMO(in_channels=2, rx_antennas=args.rx, tx_antennas=args.tx, num_classes=8)
     elif args.model == 'vgg':
         model = VGGForMIMO(in_channels=2, rx_antennas=args.rx, tx_antennas=args.tx, num_classes=8)
-    elif args.model == 'squeezenet':  # Add this condition
+    elif args.model == 'squeezenet':  
         model = SqueezeNetForMIMO(in_channels=2, rx_antennas=args.rx, tx_antennas=args.tx, num_classes=8)
-    else:  # mobilenetv2
+    else:  
         model = MobileNetV2ForMIMO(in_channels=2, rx_antennas=args.rx, tx_antennas=args.tx, num_classes=8)
     
     model = model.to(device)
     
-    # Training mode
+    
     if args.run_mode == 'train':
-        # Create data loaders
+        
         train_loader, val_loader, test_loader = create_mimo_dataloaders(
             tx_antennas=args.tx,
             rx_antennas=args.rx,
@@ -428,15 +428,15 @@ def main():
 
         print(f"Model expects input channels: {model.actual_in_channels}")
         
-        # Define loss function, optimizer, and scheduler
-        criterion = nn.BCELoss()  # Binary Cross Entropy Loss
+        
+        criterion = nn.BCELoss()  
         optimizer = optim.SGD(model.parameters(), lr=args.lr, momentum=0.9)
         
-        # Learning rate scheduler (as in the paper)
-        # Reduce by factor of 10 every 2 epochs
+        
+        
         scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=2, gamma=0.1)
         
-        # Train the model
+        
         model, history = train_model(
             model=model,
             train_loader=train_loader,
@@ -448,13 +448,13 @@ def main():
             device=device
         )
         
-        # Save the model
+        
         save_model(model, model_save_path)
         
-        # Plot training history
+        
         plot_training_history(history, save_path=history_save_path)
         
-        # Evaluate on test set
+        
         test_loss, test_acc, ber = evaluate_model(
             model=model,
             test_loader=test_loader,
@@ -464,10 +464,10 @@ def main():
         
         print(f"Test Loss: {test_loss:.4f}, Test Accuracy: {test_acc:.4f}, BER: {ber:.6f}")
     
-    # Test mode
+    
     elif args.run_mode == 'test':
-        # Load model if specified
-        # Load model if specified
+        
+        
         if args.load_model:
             if args.model == 'densenet':
                 model = load_model(DenseNetForMIMO, args.load_model, in_channels=2, rx_antennas=args.rx, tx_antennas=args.tx, num_classes=8)
@@ -475,18 +475,18 @@ def main():
                 model = load_model(ResNet50ForMIMO, args.load_model, in_channels=2, rx_antennas=args.rx, tx_antennas=args.tx, num_classes=8)
             elif args.model == 'vgg':
                 model = load_model(VGGForMIMO, args.load_model, in_channels=2, rx_antennas=args.rx, tx_antennas=args.tx, num_classes=8)
-            elif args.model == 'squeezenet':  # Add this condition
+            elif args.model == 'squeezenet':  
                 model = load_model(SqueezeNetForMIMO, args.load_model, in_channels=2, rx_antennas=args.rx, tx_antennas=args.tx, num_classes=8)
-            else:  # mobilenetv2
+            else:  
                 model = load_model(MobileNetV2ForMIMO, args.load_model, in_channels=2, rx_antennas=args.rx, tx_antennas=args.tx, num_classes=8)
             model = model.to(device)
         
-        # Create test data loader
+        
         _, _, test_loader = create_mimo_dataloaders(
             tx_antennas=args.tx,
             rx_antennas=args.rx,
             modulation=args.modulation,
-            train_samples=1000,  # Not using train and val loaders
+            train_samples=1000,  
             val_samples=1000,
             test_samples=args.test_samples,
             batch_size=args.batch_size,
@@ -495,10 +495,10 @@ def main():
             channel_type=args.channel
         )
         
-        # Define loss function
+        
         criterion = nn.BCELoss()
         
-        # Evaluate on test set
+        
         test_loss, test_acc, ber = evaluate_model(
             model=model,
             test_loader=test_loader,
@@ -508,10 +508,10 @@ def main():
         
         print(f"Test Loss: {test_loss:.4f}, Test Accuracy: {test_acc:.4f}, BER: {ber:.6f}")
     
-    # BER vs SNR mode
+    
     elif args.run_mode == 'ber':
-        # Load model if specified
-        # Load model if specified
+        
+        
         if args.load_model:
             if args.model == 'densenet':
                 model = load_model(DenseNetForMIMO, args.load_model, in_channels=2, rx_antennas=args.rx, tx_antennas=args.tx, num_classes=8)
@@ -519,13 +519,13 @@ def main():
                 model = load_model(ResNet50ForMIMO, args.load_model, in_channels=2, rx_antennas=args.rx, tx_antennas=args.tx, num_classes=8)
             elif args.model == 'vgg':
                 model = load_model(VGGForMIMO, args.load_model, in_channels=2, rx_antennas=args.rx, tx_antennas=args.tx, num_classes=8)
-            elif args.model == 'squeezenet':  # Add this condition
+            elif args.model == 'squeezenet':  
                 model = load_model(SqueezeNetForMIMO, args.load_model, in_channels=2, rx_antennas=args.rx, tx_antennas=args.tx, num_classes=8)
-            else:  # mobilenetv2
+            else:  
                 model = load_model(MobileNetV2ForMIMO, args.load_model, in_channels=2, rx_antennas=args.rx, tx_antennas=args.tx, num_classes=8)
             model = model.to(device)
         
-        # Compute BER vs SNR curve
+        
         snr_values, ber_values = compute_ber_vs_snr(
             model=model,
             tx_antennas=args.tx,
@@ -537,10 +537,10 @@ def main():
             device=device
         )
         
-        # Plot BER vs SNR curve
+        
         plot_ber_vs_snr(snr_values, ber_values, args.model, save_path=ber_save_path)
         
-        # Save BER values to file
+        
         ber_save_file = os.path.join(args.save_dir, f"{config_str}_ber.txt")
         with open(ber_save_file, 'w') as f:
             f.write("SNR,BER\n")

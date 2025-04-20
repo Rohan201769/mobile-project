@@ -16,7 +16,7 @@ def load_image_paths_from_file(filepath='png_files_list.txt'):
     with open(filepath, 'r') as f:
         paths = f.read().splitlines()
     
-    # Filter for PNG files and check existence
+    
     png_paths = [path for path in paths if path.lower().endswith('.png') and os.path.exists(path)]
     return png_paths
 
@@ -26,15 +26,15 @@ def extract_image_metadata(filepath):
     """
     filename = os.path.basename(filepath)
     
-    # Patterns to extract information
+    
     patterns = [
-        # Comparison types
+        
         r'(model_comparison|config_comparison|modulation_comparison|channel_comparison)_(?P<config>[\dx]+)_(?P<modulation>BPSK|QPSK)_(?P<channel>ideal|nonideal)',
         
-        # Specific model types
+        
         r'(densenet|mobilenetv2|resnet50|vgg|squeezenet)_(?P<config>[\dx]+)_(?P<modulation>BPSK|QPSK)_(?P<channel>ideal|nonideal)',
         
-        # Summary plots
+        
         r'(ber_comparison|ber_vs_snr)_(?P<modulation>BPSK|QPSK)_(?P<channel>ideal|nonideal)'
     ]
     
@@ -56,7 +56,7 @@ def group_images(image_paths):
             'MobileNetV2': [], 
             'ResNet50': [], 
             'VGG': [],
-            'SqueezeNet': []  # Added SqueezeNet
+            'SqueezeNet': []  
         },
         'Antenna_Configs': {},
         'Channel_Types': {'Ideal': [], 'Nonideal': []},
@@ -72,13 +72,13 @@ def group_images(image_paths):
     for path in image_paths:
         metadata = extract_image_metadata(path)
         
-        # Group by Modulation
+        
         if metadata.get('modulation') == 'BPSK':
             grouped_images['Modulation']['BPSK'].append(path)
         elif metadata.get('modulation') == 'QPSK':
             grouped_images['Modulation']['QPSK'].append(path)
         
-        # Group by Models
+        
         model_mapping = {
             'densenet': 'DenseNet',
             'mobilenetv2': 'MobileNetV2',
@@ -91,7 +91,7 @@ def group_images(image_paths):
             if model_key in path.lower():
                 grouped_images['Models'][model_name].append(path)
         
-        # Group by Antenna Configurations
+        
         config_match = re.search(r'(\dx\d+)', path)
         if config_match:
             config = config_match.group(1)
@@ -99,13 +99,13 @@ def group_images(image_paths):
                 grouped_images['Antenna_Configs'][config] = []
             grouped_images['Antenna_Configs'][config].append(path)
         
-        # Group by Channel Types
+        
         if 'ideal' in path.lower():
             grouped_images['Channel_Types']['Ideal'].append(path)
         elif 'nonideal' in path.lower():
             grouped_images['Channel_Types']['Nonideal'].append(path)
         
-        # Group by Comparison Types
+        
         comparison_types = {
             'Model_Comparison': 'model_comparison',
             'Config_Comparison': 'config_comparison',
@@ -131,7 +131,7 @@ def create_combined_plots(grouped_images):
         if not images:
             return
         
-        # Determine grid layout
+        
         n_images = len(images)
         rows = int(np.ceil(np.sqrt(n_images)))
         cols = int(np.ceil(n_images / rows))
@@ -145,14 +145,14 @@ def create_combined_plots(grouped_images):
             plt.imshow(img)
             plt.axis('off')
             
-            # Add filename as subtitle
+            
             plt.title(os.path.basename(img_path), fontsize=8)
         
         plt.tight_layout(rect=[0, 0.03, 1, 0.95])
         plt.savefig(f'final/{filename}', dpi=300, bbox_inches='tight')
         plt.close()
     
-    # Create combined plots for different groupings
+    
     for group_name, group_data in grouped_images.items():
         for subgroup_name, images in group_data.items():
             if images:
@@ -165,13 +165,13 @@ def create_combined_plots(grouped_images):
                 print(f"Created combined plot: {filename}")
 
 def main():
-    # Load image paths
+    
     image_paths = load_image_paths_from_file()
     
-    # Group images
+    
     grouped_images = group_images(image_paths)
     
-    # Create combined plots
+    
     create_combined_plots(grouped_images)
 
 if __name__ == "__main__":

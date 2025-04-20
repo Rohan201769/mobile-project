@@ -13,7 +13,7 @@ def load_ber_data(result_dir):
     data = []
     
     for file_path in ber_files:
-        # Extract metadata from filename
+        
         filename = os.path.basename(file_path)
         parts = filename.replace("_ber.txt", "").split("_")
         
@@ -26,7 +26,7 @@ def load_ber_data(result_dir):
         modulation = parts[2]
         channel = parts[3]
         
-        # Read data from file
+        
         try:
             df = pd.read_csv(file_path)
             for _, row in df.iterrows():
@@ -49,7 +49,7 @@ def load_comparison_data(result_dir):
     data = []
     
     for file_path in comparison_files:
-        # Extract metadata from filename
+        
         filename = os.path.basename(file_path)
         parts = filename.replace("comparison_", "").replace("_ber.txt", "").split("_")
         
@@ -62,11 +62,11 @@ def load_comparison_data(result_dir):
         modulation = parts[2]
         channel = parts[3]
         
-        # Read data from file
+        
         try:
             df = pd.read_csv(file_path)
             for _, row in df.iterrows():
-                # For traditional receiver
+                
                 data.append({
                     "Model": "Traditional",
                     "Config": config,
@@ -76,7 +76,7 @@ def load_comparison_data(result_dir):
                     "BER": row["Traditional_BER"]
                 })
                 
-                # For intelligent receiver
+                
                 data.append({
                     "Model": model,
                     "Config": config,
@@ -113,7 +113,7 @@ def plot_model_comparison(df, output_dir):
             model_data = subset[subset["Model"] == model]
             plt.semilogy(model_data["SNR"], model_data["BER"], marker='o', linestyle='-', label=model)
         
-        # Add traditional receiver if available
+        
         trad_data = subset[subset["Model"] == "Traditional"]
         if not trad_data.empty:
             plt.semilogy(trad_data["SNR"], trad_data["BER"], marker='s', linestyle='--', label="Traditional", color='black')
@@ -245,14 +245,14 @@ def plot_modulation_comparison(df, output_dir):
 
 def create_summary_table(df, output_dir):
     """Create a summary table of BER values at specific SNR points"""
-    # Select representative SNR values
+    
     snr_points = [0, 2, 4, 6, 8]
     summary_data = []
     
     os.makedirs(output_dir, exist_ok=True)
     
     for snr in snr_points:
-        # Get closest SNR value in the data
+        
         closest_snr = df["SNR"].unique()[np.abs(df["SNR"].unique() - snr).argmin()]
         
         snr_df = df[df["SNR"] == closest_snr]
@@ -269,10 +269,10 @@ def create_summary_table(df, output_dir):
     
     summary_df = pd.DataFrame(summary_data)
     
-    # Save the full summary table
+    
     summary_df.to_csv(os.path.join(output_dir, "ber_summary_table.csv"), index=False)
     
-    # Create summarized tables for specific configurations
+    
     configs = summary_df["Config"].unique()
     modulations = summary_df["Modulation"].unique()
     channels = summary_df["Channel"].unique()
@@ -317,20 +317,20 @@ def main():
     
     args = parser.parse_args()
     
-    # Create output directory
+    
     os.makedirs(args.output_dir, exist_ok=True)
     
-    # Load data
+    
     print("Loading BER data...")
     ber_df = load_ber_data(args.result_dir)
     
     print("Loading comparison data...")
     comparison_df = load_comparison_data(args.result_dir)
     
-    # Combine data (removing duplicate entries)
+    
     combined_df = pd.concat([ber_df, comparison_df]).drop_duplicates()
     
-    # Plot comparisons
+    
     print("Creating model comparison plots...")
     plot_model_comparison(combined_df, os.path.join(args.output_dir, "model_comparison"))
     

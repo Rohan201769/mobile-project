@@ -4,11 +4,11 @@ import torch.nn.functional as F
 import numpy as np
 
 
-# ------------- Basic Blocks for DenseNet -------------
+
 class BasicBlock(nn.Module):
     def __init__(self, in_channels, growth_rate):
         super(BasicBlock, self).__init__()
-        # BN-ReLU-Conv sequence as mentioned in the paper
+        
         self.bn1 = nn.BatchNorm1d(in_channels)
         self.relu1 = nn.ReLU(inplace=True)
         self.conv1 = nn.Conv1d(in_channels, 4 * growth_rate, kernel_size=1, bias=False)
@@ -29,13 +29,13 @@ class TransitionLayer(nn.Module):
         self.bn = nn.BatchNorm1d(in_channels)
         self.relu = nn.ReLU(inplace=True)
         self.conv = nn.Conv1d(in_channels, out_channels, kernel_size=1, bias=False)
-        # Only apply pooling if the feature map is large enough
+        
         self.use_pooling = True
         self.avg_pool = nn.AvgPool1d(kernel_size=2, stride=2)
     
     def forward(self, x):
         out = self.conv(self.relu(self.bn(x)))
-        # Check if the sequence length is greater than 1 before pooling
+        
         if out.size(-1) > 1 and self.use_pooling:
             out = self.avg_pool(out)
         return out
@@ -54,33 +54,33 @@ class DenseBlock(nn.Module):
         return x
 
 
-# ------------- DenseNet Model -------------
+
 class DenseNetForMIMO(nn.Module):
     def __init__(self, in_channels=2, rx_antennas=1, tx_antennas=2, num_classes=8, growth_rate=32, block_config=(6, 12, 24, 16)):
         super(DenseNetForMIMO, self).__init__()
         
-        # Calculate actual input channels based on tx and rx antennas
+        
         if tx_antennas == 2:
-            self.actual_in_channels = in_channels * rx_antennas  # 2 per rx antenna
+            self.actual_in_channels = in_channels * rx_antennas  
         elif tx_antennas == 3:
-            self.actual_in_channels = 8 * rx_antennas  # 8 per rx antenna
+            self.actual_in_channels = 8 * rx_antennas  
         elif tx_antennas == 4:
-            self.actual_in_channels = 4 * rx_antennas  # 4 per rx antenna
+            self.actual_in_channels = 4 * rx_antennas  
         elif tx_antennas == 8:
-            self.actual_in_channels = 8 * rx_antennas  # 8 per rx antenna for 8x8 STBC
+            self.actual_in_channels = 8 * rx_antennas  
         else:
             raise ValueError(f"Unsupported number of transmit antennas: {tx_antennas}")
         
         print(f"Creating DenseNet with rx={rx_antennas}, tx={tx_antennas}, in_channels={in_channels}")
         print(f"Setting actual_in_channels to {self.actual_in_channels}")
         
-        # Initial convolution
+        
         self.conv1 = nn.Conv1d(self.actual_in_channels, 64, kernel_size=7, stride=2, padding=3, bias=False)
         self.bn1 = nn.BatchNorm1d(64)
         self.relu = nn.ReLU(inplace=True)
         self.max_pool = nn.MaxPool1d(kernel_size=3, stride=2, padding=1)
         
-        # Dense blocks
+        
         num_features = 64
         self.dense_blocks = nn.ModuleList()
         self.transition_layers = nn.ModuleList()
@@ -93,13 +93,13 @@ class DenseNetForMIMO(nn.Module):
                 self.transition_layers.append(TransitionLayer(num_features, num_features // 2))
                 num_features = num_features // 2
         
-        # Final batch norm
+        
         self.bn_final = nn.BatchNorm1d(num_features)
         
-        # Linear layer
+        
         self.classifier = nn.Linear(num_features, num_classes)
         
-        # Initialize weights
+        
         for m in self.modules():
             if isinstance(m, nn.Conv1d):
                 nn.init.kaiming_normal_(m.weight)
@@ -110,7 +110,7 @@ class DenseNetForMIMO(nn.Module):
                 nn.init.constant_(m.bias, 0)
     
     def forward(self, x):
-        # x shape: (batch_size, 2, seq_len)
+        
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
@@ -124,18 +124,18 @@ class DenseNetForMIMO(nn.Module):
         x = self.bn_final(x)
         x = self.relu(x)
         
-        # Global average pooling
+        
         x = F.adaptive_avg_pool1d(x, 1)
         x = x.view(x.size(0), -1)
         
-        # Classification
+        
         x = self.classifier(x)
-        x = torch.sigmoid(x)  # Binary classification for each bit
+        x = torch.sigmoid(x)  
         
         return x
 
 
-# ------------- ResNet Components -------------
+
 class ResidualBlock(nn.Module):
     expansion = 1
     
@@ -189,20 +189,20 @@ class BottleneckBlock(nn.Module):
         return out
 
 
-# ------------- ResNet Model -------------
+
 class ResNetForMIMO(nn.Module):
     def __init__(self, block, num_blocks, in_channels=2, rx_antennas=1, tx_antennas=2, num_classes=8):
         super(ResNetForMIMO, self).__init__()
         
-        # Calculate actual input channels based on tx and rx antennas
+        
         if tx_antennas == 2:
-            self.actual_in_channels = in_channels * rx_antennas  # 2 per rx antenna
+            self.actual_in_channels = in_channels * rx_antennas  
         elif tx_antennas == 3:
-            self.actual_in_channels = 8 * rx_antennas  # 8 per rx antenna
+            self.actual_in_channels = 8 * rx_antennas  
         elif tx_antennas == 4:
-            self.actual_in_channels = 4 * rx_antennas  # 4 per rx antenna
+            self.actual_in_channels = 4 * rx_antennas  
         elif tx_antennas == 8:
-            self.actual_in_channels = 8 * rx_antennas  # 8 per rx antenna for 8x8 STBC
+            self.actual_in_channels = 8 * rx_antennas  
         else:
             raise ValueError(f"Unsupported number of transmit antennas: {tx_antennas}")
         
@@ -243,7 +243,7 @@ class ResNetForMIMO(nn.Module):
         out = self.avgpool(out)
         out = out.view(out.size(0), -1)
         out = self.fc(out)
-        out = torch.sigmoid(out)  # Binary classification for each bit
+        out = torch.sigmoid(out)  
         
         return out
 
@@ -252,7 +252,7 @@ def ResNet50ForMIMO(in_channels=2, rx_antennas=1, tx_antennas=2, num_classes=8):
     return ResNetForMIMO(BottleneckBlock, [3, 4, 6, 3], in_channels, rx_antennas, tx_antennas, num_classes)
 
 
-# ------------- MobileNetV2 Components -------------
+
 class InvertedResidual(nn.Module):
     def __init__(self, in_channels, out_channels, stride, expand_ratio):
         super(InvertedResidual, self).__init__()
@@ -262,19 +262,19 @@ class InvertedResidual(nn.Module):
         
         layers = []
         if expand_ratio != 1:
-            # Expansion
+            
             layers.append(nn.Conv1d(in_channels, hidden_dim, kernel_size=1, bias=False))
             layers.append(nn.BatchNorm1d(hidden_dim))
             layers.append(nn.ReLU6(inplace=True))
         
-        # Depthwise
+        
         layers.extend([
-            # Depthwise convolution
+            
             nn.Conv1d(hidden_dim, hidden_dim, kernel_size=3, stride=stride, padding=1, groups=hidden_dim, bias=False),
             nn.BatchNorm1d(hidden_dim),
             nn.ReLU6(inplace=True),
             
-            # Pointwise
+            
             nn.Conv1d(hidden_dim, out_channels, kernel_size=1, bias=False),
             nn.BatchNorm1d(out_channels),
         ])
@@ -288,20 +288,20 @@ class InvertedResidual(nn.Module):
             return self.conv(x)
 
 
-# ------------- MobileNetV2 Model -------------
+
 class MobileNetV2ForMIMO(nn.Module):
     def __init__(self, in_channels=2, rx_antennas=1, tx_antennas=2, num_classes=8, width_mult=1.0):
         super(MobileNetV2ForMIMO, self).__init__()
         
-        # Calculate actual input channels based on tx and rx antennas
+        
         if tx_antennas == 2:
-            self.actual_in_channels = in_channels * rx_antennas  # 2 per rx antenna
+            self.actual_in_channels = in_channels * rx_antennas  
         elif tx_antennas == 3:
-            self.actual_in_channels = 8 * rx_antennas  # 8 per rx antenna
+            self.actual_in_channels = 8 * rx_antennas  
         elif tx_antennas == 4:
-            self.actual_in_channels = 4 * rx_antennas  # 4 per rx antenna
+            self.actual_in_channels = 4 * rx_antennas  
         elif tx_antennas == 8:
-            self.actual_in_channels = 8 * rx_antennas  # 8 per rx antenna for 8x8 STBC
+            self.actual_in_channels = 8 * rx_antennas  
         else:
             raise ValueError(f"Unsupported number of transmit antennas: {tx_antennas}")
         
@@ -312,7 +312,7 @@ class MobileNetV2ForMIMO(nn.Module):
         input_channel = 32
         last_channel = 1280
         
-        # Shallow feature extraction part
+        
         self.shallow_features = nn.Sequential(
             nn.Conv1d(self.actual_in_channels, 16, kernel_size=3, stride=2, padding=1, bias=False),
             nn.BatchNorm1d(16),
@@ -323,12 +323,12 @@ class MobileNetV2ForMIMO(nn.Module):
             nn.ReLU(inplace=True),
         )
         
-        # First inverted residual block
+        
         self.first_block = block(input_channel, 16, 1, 1)
         
-        # Building inverted residual blocks (backbone)
+        
         inverted_residual_setting = [
-            # t, c, n, s
+            
             [6, 24, 2, 2],
             [6, 32, 3, 2],
             [6, 64, 4, 2],
@@ -337,7 +337,7 @@ class MobileNetV2ForMIMO(nn.Module):
             [6, 320, 1, 1],
         ]
         
-        # Start from 16 channels after first block
+        
         input_channel = 16
         
         self.backbone = nn.ModuleList()
@@ -348,20 +348,20 @@ class MobileNetV2ForMIMO(nn.Module):
                 self.backbone.append(block(input_channel, output_channel, stride, t))
                 input_channel = output_channel
         
-        # Last stage
+        
         self.last_stage = nn.Sequential(
             nn.Conv1d(input_channel, last_channel, kernel_size=1, bias=False),
             nn.BatchNorm1d(last_channel),
             nn.ReLU(inplace=True),
         )
         
-        # Classifier
+        
         self.classifier = nn.Sequential(
             nn.Dropout(0.2),
             nn.Linear(last_channel, num_classes),
         )
         
-        # Initialize weights
+        
         for m in self.modules():
             if isinstance(m, nn.Conv1d):
                 nn.init.kaiming_normal_(m.weight, mode='fan_out')
@@ -375,53 +375,53 @@ class MobileNetV2ForMIMO(nn.Module):
                 nn.init.zeros_(m.bias)
     
     def forward(self, x):
-        # Shallow feature extraction
+        
         x = self.shallow_features(x)
         
-        # First block
+        
         x = self.first_block(x)
         
-        # Backbone
+        
         for layer in self.backbone:
             x = layer(x)
         
-        # Last stage
+        
         x = self.last_stage(x)
         
-        # Global average pooling
+        
         x = F.adaptive_avg_pool1d(x, 1)
         x = x.view(x.size(0), -1)
         
-        # Classification
+        
         x = self.classifier(x)
-        x = torch.sigmoid(x)  # Binary classification for each bit
+        x = torch.sigmoid(x)  
         
         return x
     
 
-# ------------- VGG Model -------------
+
 class VGGForMIMO(nn.Module):
     def __init__(self, in_channels=2, rx_antennas=1, tx_antennas=2, num_classes=8):
         super(VGGForMIMO, self).__init__()
         
-        # Calculate actual input channels based on tx and rx antennas
+        
         if tx_antennas == 2:
-            self.actual_in_channels = in_channels * rx_antennas  # 2 per rx antenna
+            self.actual_in_channels = in_channels * rx_antennas  
         elif tx_antennas == 3:
-            self.actual_in_channels = 8 * rx_antennas  # 8 per rx antenna
+            self.actual_in_channels = 8 * rx_antennas  
         elif tx_antennas == 4:
-            self.actual_in_channels = 4 * rx_antennas  # 4 per rx antenna
+            self.actual_in_channels = 4 * rx_antennas  
         elif tx_antennas == 8:
-            self.actual_in_channels = 8 * rx_antennas  # 8 per rx antenna for 8x8 STBC
+            self.actual_in_channels = 8 * rx_antennas  
         else:
             raise ValueError(f"Unsupported number of transmit antennas: {tx_antennas}")
         
         print(f"Creating VGG with rx={rx_antennas}, tx={tx_antennas}, in_channels={in_channels}")
         print(f"Setting actual_in_channels to {self.actual_in_channels}")
         
-        # VGG16-inspired architecture, adapted for 1D signals
+        
         self.features = nn.Sequential(
-            # Block 1
+            
             nn.Conv1d(self.actual_in_channels, 64, kernel_size=3, padding=1),
             nn.BatchNorm1d(64),
             nn.ReLU(inplace=True),
@@ -429,9 +429,9 @@ class VGGForMIMO(nn.Module):
             nn.BatchNorm1d(64),
             nn.ReLU(inplace=True),
             
-            # No pooling for sequence length of 2
             
-            # Block 2
+            
+            
             nn.Conv1d(64, 128, kernel_size=3, padding=1),
             nn.BatchNorm1d(128),
             nn.ReLU(inplace=True),
@@ -439,7 +439,7 @@ class VGGForMIMO(nn.Module):
             nn.BatchNorm1d(128),
             nn.ReLU(inplace=True),
             
-            # Block 3
+            
             nn.Conv1d(128, 256, kernel_size=3, padding=1),
             nn.BatchNorm1d(256),
             nn.ReLU(inplace=True),
@@ -451,20 +451,20 @@ class VGGForMIMO(nn.Module):
             nn.ReLU(inplace=True),
         )
         
-        # Classifier
+        
         self.classifier = nn.Sequential(
             nn.Flatten(),
-            nn.Linear(256 * 2, 512),  # 2 is the sequence length
+            nn.Linear(256 * 2, 512),  
             nn.ReLU(True),
             nn.Dropout(0.5),
             nn.Linear(512, 256),
             nn.ReLU(True),
             nn.Dropout(0.5),
             nn.Linear(256, num_classes),
-            nn.Sigmoid()  # For binary classification
+            nn.Sigmoid()  
         )
         
-        # Initialize weights
+        
         for m in self.modules():
             if isinstance(m, nn.Conv1d):
                 nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
@@ -484,7 +484,7 @@ class VGGForMIMO(nn.Module):
     
 
 
-# ------------- SqueezeNet Components -------------
+
 class FireModule(nn.Module):
     def __init__(self, in_channels, squeeze_channels, expand1x1_channels, expand3x3_channels):
         super(FireModule, self).__init__()
@@ -503,27 +503,27 @@ class FireModule(nn.Module):
         ], 1)
 
 
-# ------------- SqueezeNet Model -------------
+
 class SqueezeNetForMIMO(nn.Module):
     def __init__(self, in_channels=2, rx_antennas=1, tx_antennas=2, num_classes=8, version='1_0'):
         super(SqueezeNetForMIMO, self).__init__()
         
-        # Calculate actual input channels based on tx and rx antennas
+        
         if tx_antennas == 2:
-            self.actual_in_channels = in_channels * rx_antennas  # 2 per rx antenna
+            self.actual_in_channels = in_channels * rx_antennas  
         elif tx_antennas == 3:
-            self.actual_in_channels = 8 * rx_antennas  # 8 per rx antenna
+            self.actual_in_channels = 8 * rx_antennas  
         elif tx_antennas == 4:
-            self.actual_in_channels = 4 * rx_antennas  # 4 per rx antenna
+            self.actual_in_channels = 4 * rx_antennas  
         elif tx_antennas == 8:
-            self.actual_in_channels = 8 * rx_antennas  # 8 per rx antenna for 8x8 STBC
+            self.actual_in_channels = 8 * rx_antennas  
         else:
             raise ValueError(f"Unsupported number of transmit antennas: {tx_antennas}")
         
         print(f"Creating SqueezeNet with rx={rx_antennas}, tx={tx_antennas}, in_channels={in_channels}")
         print(f"Setting actual_in_channels to {self.actual_in_channels}")
         
-        # Simplified architecture for small sequence lengths
+        
         self.features = nn.Sequential(
             nn.Conv1d(self.actual_in_channels, 64, kernel_size=3, stride=1, padding=1),
             nn.ReLU(inplace=True),
@@ -535,24 +535,24 @@ class SqueezeNetForMIMO(nn.Module):
             FireModule(384, 48, 192, 192),
         )
         
-        # Final convolution
+        
         self.final_conv = nn.Conv1d(384, 512, kernel_size=1)
         self.dropout = nn.Dropout(p=0.5)
         self.relu = nn.ReLU(inplace=True)
         
-        # Adaptive pooling to handle variable size inputs
+        
         self.global_pool = nn.AdaptiveAvgPool1d(1)
         
-        # Classifier
+        
         self.classifier = nn.Sequential(
             nn.Linear(512, 256),
             nn.ReLU(inplace=True),
             nn.Dropout(p=0.5),
             nn.Linear(256, num_classes),
-            nn.Sigmoid()  # Binary classification for each bit
+            nn.Sigmoid()  
         )
         
-        # Initialize weights
+        
         for m in self.modules():
             if isinstance(m, nn.Conv1d):
                 nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
